@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <article>
+        <header>
+            <h2>⚠️ Vínculo Automático Falhou</h2>
+            <p>Criamos a planilha de respostas, mas não foi possível vinculá-la automaticamente ao seu formulário. Por favor, siga os passos abaixo para conectar manualmente.</p>
+        </header>
+
+        <h5>1. Planilha Criada com Sucesso</h5>
+        <ul>
+            <li><strong>Nome da Planilha:</strong> {{ pending_link.sheet_title }}</li>
+            <li><strong>ID da Planilha:</strong> <code>{{ pending_link.sheet_id }}</code> <button onclick="copyToClipboard('{{ pending_link.sheet_id }}')">Copiar</button></li>
+            <li><a href="{{ pending_link.sheet_url }}" target="_blank" role="button" class="contrast">Abrir Planilha ↗</a></li>
+        </ul>
+
+        <h5>2. Vincule Manualmente no Google Forms</h5>
+        <ol>
+            <li>Abra seu formulário: <a href="{{ pending_link.form_url }}" target="_blank"><strong>{{ pending_link.form_title }}</strong> ↗</a></li>
+            <li>Vá para a aba "<strong>Respostas</strong>".</li>
+            <li>Clique no ícone verde do Google Sheets (planilhas).</li>
+            <li>Selecione a opção "<strong>Selecionar planilha de respostas existente</strong>".</li>
+            <li>Encontre e selecione a planilha recém-criada: "<strong>{{ pending_link.sheet_title }}</strong>".</li>
+        </ol>
+
+        <footer>
+            <p>Após vincular, você pode voltar e adicionar o formulário à sua lista.</p>
+            <a href="{{ url_for('main.search_sheets') }}" role="button">← Voltar</a>
+        </footer>
+    </article>
+</div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('ID da Planilha copiado para a área de transferência!');
+    }, function(err) {
+        alert('Erro ao copiar o texto: ', err);
+    });
+}
+</script>
+{% endblock %}

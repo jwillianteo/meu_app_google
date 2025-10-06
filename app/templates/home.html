@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Bem-vindo à Página Inicial</h2>
+    {% if current_user.is_authenticated %}
+        <p>Olá, {{ current_user.username }}! Você está logado.</p>
+        <a href="{{ url_for('main.dashboard') }}">Ir para o Dashboard</a>
+        <br><br>
+        <a href="{{ url_for('main.logout') }}">Sair (Logout)</a>
+    {% else %}
+        <p>Você não está logado.</p>
+        <a href="{{ url_for('main.login') }}">Fazer Login</a>
+    {% endif %}
+{% endblock %}

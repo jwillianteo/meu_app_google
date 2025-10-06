@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <h1 style="margin-bottom: 0.5rem;">Selecione um Formulário</h1>
+    <p style="color: var(--pico-muted-color); margin-top: 0;">
+        Encontramos os seguintes formulários na sua conta Google. 
+        Você pode adicioná-los à sua lista ou selecioná-los diretamente para trabalhar.
+    </p>
+</div>
+
+{% if spreadsheets %}
+    <table role="grid">
+        <thead>
+            <tr>
+                <th scope="col">Nome do Formulário</th>
+                <th scope="col">Status</th>
+                <th scope="col" style="text-align: center;">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for form in spreadsheets %}
+            <tr>
+                <td>
+                    <strong>{{ form.name }}</strong>
+                    <br>
+                    <small style="color: var(--pico-muted-color);">
+                        Modificado: {{ form.modifiedTime[:10] if form.modifiedTime else 'N/A' }}
+                    </small>
+                </td>
+                <td>
+                    {% if form.response_sheet_id %}
+                        <span style="color: var(--pico-color-green-500);">✓ Com respostas</span>
+                    {% else %}
+                        <span style="color: var(--pico-muted-color);">⚠ Sem planilha vinculada</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">
+                    {% if form.response_sheet_id %}
+                        <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                            <form method="POST" action="{{ url_for('main.select_form', form_id=form.id, sheet_id=form.response_sheet_id) }}" style="margin: 0;">
+                                <input type="hidden" name="nome_formulario" value="{{ form.name }}">
+                                <button type="submit" class="secondary" style="margin: 0; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    🎯 Selecionar
+                                </button>
+                            </form>
+                            
+                            <button onclick="toggleConfig('{{ form.id }}')" style="margin: 0; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                ⚙️ Configurar
+                            </button>
+                        </div>
+                        
+                        <div id="config-{{ form.id }}" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px; border: 1px solid var(--pico-card-border-color);">
+                            <form method="POST" action="{{ url_for('main.manage_sheets') }}">
+                                <input type="hidden" name="nome_amigavel" value="{{ form.name }}">
+                                <input type="hidden" name="spreadsheet_id" value="{{ form.response_sheet_id }}">
+                                
+                                <label for="range-{{ form.id }}">
+                                    Intervalo de Dados:
+                                    <small>Ex: 'Respostas ao formulário 1'!A:Z</small>
+                                </label>
+                                <input type="text" id="range-{{ form.id }}" name="range_name" value="Respostas ao formulário 1!A:Z" required>
+                                
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button type="submit" style="flex: 1;">✓ Adicionar</button>
+                                    <button type="button" onclick="toggleConfig('{{ form.id }}')" class="secondary" style="flex: 1;">✕ Cancelar</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('main.create_and_link_sheet', form_id=form.id) }}" style="margin: 0;">
+                            <button type="submit" class="secondary" style="margin: 0; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                ⚙️ Criar e Vincular
+                            </button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div style="margin-top: 2rem; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px; border-left: 4px solid var(--pico-color-blue-500);">
+        <h4 style="margin-top: 0;">💡 Dica:</h4>
+        <ul style="margin-bottom: 0;">
+            <li><strong>Selecionar:</strong> Escolhe o formulário e vai direto para o dashboard.</li>
+            <li><strong>Configurar:</strong> Permite personalizar o intervalo de dados antes de adicionar.</li>
+            <li><strong>Criar e Vincular:</strong> Automatiza a criação da planilha de respostas no seu Google Drive.</li>
+        </ul>
+    </div>
+{% else %}
+    <div style="padding: 2rem; text-align: center; background: var(--pico-card-background-color); border-radius: 8px; border: 1px solid var(--pico-card-border-color);">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+        <h3>Nenhum formulário encontrado</h3>
+        <p style="color: var(--pico-muted-color);">
+            Não encontramos Google Forms na sua conta. Certifique-se de ter formulários criados no Google Forms.
+        </p>
+    </div>
+{% endif %}
+
+<div style="margin-top: 2rem; display: flex; gap: 1rem;">
+    <a href="{{ url_for('main.manage_sheets') }}" role="button" class="secondary">← Voltar para Gerenciar</a>
+    <a href="{{ url_for('main.dashboard') }}" role="button" class="outline">🏠 Voltar ao Dashboard</a>
+</div>
+
+<script>
+function toggleConfig(formId) {
+    const configDiv = document.getElementById('config-' + formId);
+    if (configDiv.style.display === 'none') {
+        configDiv.style.display = 'block';
+    } else {
+        configDiv.style.display = 'none';
+    }
+}
+</script>
+
+{% endblock %}

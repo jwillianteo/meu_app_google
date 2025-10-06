@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Análise de Segmentação de Alunos (Machine Learning)</h2>
+    <p>O algoritmo K-Means analisou seus dados e encontrou os seguintes perfis de estudantes:</p>
+
+    <hr>
+
+    {% if segmentos %}
+        {% for seg in segmentos %}
+            <h3>Perfil de Estudante #{{ seg.id + 1 }} ({{ seg.total }} alunos)</h3>
+            <p><strong>Resumo do Perfil:</strong> {{ seg.descricao }}</p>
+
+            <h4>Alunos neste Segmento:</h4>
+            <table border="1" cellpadding="5" cellspacing="0" style="margin-bottom: 2em;">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Idade</th>
+                        <th>Cidade</th>
+                        <th>Curso de Interesse</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for aluno in seg.alunos %}
+                    <tr>
+                        <td>{{ aluno.nome }}</td>
+                        <td>{{ aluno.idade }}</td>
+                        <td>{{ aluno.cidade }}</td>
+                        <td>{{ aluno.curso_interesse }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endfor %}
+    {% else %}
+        <p>Não foi possível gerar os segmentos de estudantes. Verifique se você tem dados suficientes.</p>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('main.dashboard') }}">Voltar para o Dashboard</a>
+{% endblock %}

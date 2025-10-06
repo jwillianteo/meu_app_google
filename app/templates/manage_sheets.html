@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+    <a href="{{ url_for('main.search_sheets') }}" role="button" class="contrast">
+        Buscar Formulários no meu Google Drive
+    </a>
+
+    <h3 style="margin-top: 2em;">Formulários Cadastrados</h3>
+    {% if planilhas %}
+        <figure>
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Nome do Formulário</th>
+                        <th scope="col">ID da Planilha de Respostas</th>
+                        <th scope="col">Intervalo</th>
+                        <th scope="col">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in planilhas %}
+                    <tr>
+                        <td>{{ p.nome_amigavel }}</td>
+                        <td>{{ p.spreadsheet_id }}</td>
+                        <td>{{ p.range_name }}</td>
+                        <td>
+                            <div class="grid">
+                                <a href="{{ url_for('main.view_sheet_data', planilha_id=p.id) }}" role="button" class="outline secondary" target="_blank">Ver Dados Brutos (JSON)</a>
+                                <a href="{{ url_for('main.process_sheet', planilha_id=p.id) }}" role="button" class="outline">Processar e Salvar</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </figure>
+    {% else %}
+        <p>Você ainda não cadastrou nenhum formulário.</p>
+    {% endif %}
+    
+    <a href="{{ url_for('main.dashboard') }}">Voltar para o Dashboard</a>
+{% endblock %}

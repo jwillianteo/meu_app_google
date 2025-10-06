@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Resetar Senha</h2>
+    <form method="POST" action="{{ url_for('main.reset_request') }}">
+        <div>
+            <label for="email">Digite seu Endereço de Email:</label><br>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <br>
+        <div>
+            <button type="submit">Solicitar Reset de Senha</button>
+        </div>
+    </form>
+{% endblock %}

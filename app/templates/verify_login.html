@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Quase lá!</h2>
+    <p>Enviamos um link de login para o seu endereço de e-mail.</p>
+    <p>Por favor, clique no link para completar o processo e acessar sua conta.</p>
+    <p><strong>Lembre-se de checar sua caixa de spam se não encontrar o e-mail.</strong></p>
+    <br>
+    <p><a href="{{ url_for('main.login') }}">Voltar para a página de login</a></p>
+{% endblock %}

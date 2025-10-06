@@ -1,0 +1,14 @@
+# Ambiente Virtual
+venv/
+
+# Arquivos de ambiente com segredos
+.env
+
+# Arquivos compilados do Python
+__pycache__/
+*.pyc
+
+# Credenciais do Google
+client_secret.json
+
+credencial_google.json

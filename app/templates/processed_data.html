@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Visualização dos Dados Estruturados</h2>
+    <p>Estes são os dados que foram importados das suas planilhas e agora estão salvos no banco de dados PostgreSQL, prontos para análise.</p>
+    
+    {% if estudantes %}
+        <table border="1" cellpadding="5" cellspacing="0" style="width: 100%; text-align: left;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Idade</th>
+                    <th>Cidade</th>
+                    <th>Curso de Interesse</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for estudante in estudantes %}
+                <tr>
+                    <td>{{ estudante.id }}</td>
+                    <td>{{ estudante.nome }}</td>
+                    <td>{{ estudante.idade }}</td>
+                    <td>{{ estudante.cidade }}</td>
+                    <td>{{ estudante.curso_interesse }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Nenhum dado de estudante foi processado ainda. Vá para a página de "Gerenciar Planilhas" e processe uma fonte de dados.</p>
+    {% endif %}
+    
+    <br>
+    <a href="{{ url_for('main.dashboard') }}">Voltar para o Dashboard</a>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+    <form method="POST" action="{{ url_for('main.login') }}">
+        <input type="email" id="email" name="email" placeholder="Endereço de e-mail" required>
+        <input type="password" id="password" name="password" placeholder="Senha" required>
+        <button type="submit">Entrar</button>
+    </form>
+    <small><a href="{{ url_for('main.reset_request') }}">Esqueceu sua senha?</a></small><br>
+    <small>Ainda não tem uma conta? <a href="{{ url_for('main.register') }}">Cadastre-se aqui</a>.</small>
+{% endblock %}

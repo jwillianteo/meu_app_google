@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Dados da sua Planilha</h2>
+
+    {% if data %}
+        <table border="1">
+            {% for row in data %}
+                <tr>
+                    {% for cell in row %}
+                        <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>Nenhum dado encontrado no intervalo especificado.</p>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('main.dashboard') }}">Voltar para o Dashboard</a>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+    <p>Aqui estão alguns insights gerados a partir dos <strong>{{ total_estudantes }}</strong> registros de estudantes processados.</p>
+    
+    <div class="grid">
+        <div class="chart-container">
+            <h3>Popularidade dos Cursos</h3>
+            <canvas id="cursosChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>Distribuição de Alunos por Cidade</h3>
+            <canvas id="cidadesChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="grid">
+        <div class="chart-container">
+            <h3>Acesso por Dispositivo (Simulação IoT)</h3>
+            <canvas id="dispositivosChart"></canvas>
+        </div>
+        <div></div>
+    </div>
+    
+    <h3>Idade Média por Interesse de Curso</h3>
+    <p><strong>Idade Média Geral:</strong> {{ idade_media_geral }} anos</p>
+    {% if idade_media_por_curso %}
+        <figure>
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Curso de Interesse</th>
+                        <th scope="col">Idade Média</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for curso, idade_media in idade_media_por_curso.items() %}
+                    <tr>
+                        <td>{{ curso }}</td>
+                        <td>{{ idade_media }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </figure>
+    {% else %}
+        <p>Não há dados suficientes para esta análise.</p>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('main.dashboard') }}" role="button" class="secondary">Voltar para o Dashboard</a>
+
+    <script>
+        // Pega os dados que o Flask nos enviou
+        const cursosData = {{ popularidade_cursos | tojson }};
+        const cidadesData = {{ alunos_por_cidade | tojson }};
+        const dispositivosData = {{ acesso_por_dispositivo | tojson }};
+
+        // Configuração do Gráfico de Cursos (Gráfico de Barras)
+        const ctxCursos = document.getElementById('cursosChart').getContext('2d');
+        new Chart(ctxCursos, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(cursosData),
+                datasets: [{
+                    label: '# de Estudantes Interessados',
+                    data: Object.values(cursosData),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+
+        // Configuração do Gráfico de Cidades (Gráfico de Pizza)
+        const ctxCidades = document.getElementById('cidadesChart').getContext('2d');
+        new Chart(ctxCidades, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(cidadesData),
+                datasets: [{
+                    label: 'Alunos por Cidade',
+                    data: Object.values(cidadesData),
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)'
+                    ],
+                }]
+            }
+        });
+
+        // Configuração do Gráfico de Dispositivos (Gráfico de Rosca/Doughnut)
+        const ctxDispositivos = document.getElementById('dispositivosChart').getContext('2d');
+        new Chart(ctxDispositivos, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(dispositivosData),
+                datasets: [{
+                    label: 'Acessos por Dispositivo',
+                    data: Object.values(dispositivosData),
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(153, 102, 255, 0.6)'
+                    ],
+                }]
+            }
+        });
+    </script>
+{% endblock %}
