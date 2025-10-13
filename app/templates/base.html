@@ -6,14 +6,22 @@
     <title>{{ title }} - Data Analyzer</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.cdnfonts.com/css/now" rel="stylesheet">
+    <link href="https://fonts.cdnfonts.com/css/buffalo-2" rel="stylesheet">
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <main class="container">
         <nav>
             <ul>
-                <li><strong>Data Analyzer PI4</strong></li>
+                <li><strong class="font-logo">Data Analyzer</strong></li>
             </ul>
             <ul>
                 {% if current_user.is_authenticated %}
@@ -29,16 +37,16 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <article>
+                    <div class="alert" role="alert">
                         {{ message }}
-                    </article>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
         
         <article>
             <header>
-                <h2>{{ title }}</h2>
+                <h2 class="font-subtitle">{{ title }}</h2>
             </header>
             {% block content %}{% endblock %}
         </article>

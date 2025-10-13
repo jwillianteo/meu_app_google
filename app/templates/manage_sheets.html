@@ -1,31 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
-    <a href="{{ url_for('main.search_sheets') }}" role="button" class="contrast">
+    <a href="{{ url_for('main.search_sheets') }}" role="button">
+        <span style="font-size: 1.2rem; margin-right: 0.5rem;">🔍</span>
         Buscar Formulários no meu Google Drive
     </a>
 
-    <h3 style="margin-top: 2em;">Formulários Cadastrados</h3>
+    <h3 style="margin-top: 2em;">Formulários Conectados</h3>
     {% if planilhas %}
         <figure>
             <table>
                 <thead>
                     <tr>
                         <th scope="col">Nome do Formulário</th>
-                        <th scope="col">ID da Planilha de Respostas</th>
-                        <th scope="col">Intervalo</th>
-                        <th scope="col">Ações</th>
+                        <th scope="col">ID da Planilha</th>
+                        <th scope="col" style="text-align: center;">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for p in planilhas %}
                     <tr>
-                        <td>{{ p.nome_amigavel }}</td>
-                        <td>{{ p.spreadsheet_id }}</td>
-                        <td>{{ p.range_name }}</td>
-                        <td>
-                            <div class="grid">
-                                <a href="{{ url_for('main.view_sheet_data', planilha_id=p.id) }}" role="button" class="outline secondary" target="_blank">Ver Dados Brutos (JSON)</a>
-                                <a href="{{ url_for('main.process_sheet', planilha_id=p.id) }}" role="button" class="outline">Processar e Salvar</a>
+                        <td><strong>{{ p.nome_amigavel }}</strong></td>
+                        <td><small>{{ p.spreadsheet_id }}</small></td>
+                        <td style="text-align: center;">
+                            <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                                
+                                <a href="{{ url_for('main.process_sheet', planilha_id=p.id) }}" role="button" class="outline" style="margin: 0;">
+                                    ⚙️ Processar
+                                </a>
+                                
+                                <form method="POST" action="{{ url_for('main.remove_sheet', planilha_id=p.id) }}" 
+                                      onsubmit="return confirm('Tem certeza que deseja desconectar este formulário? Os dados já processados serão removidos do sistema, mas a planilha original no seu Google Drive NÃO será alterada.');" 
+                                      style="margin: 0;">
+                                    <button type="submit" class="outline" style="margin: 0; border-color: var(--cor-vermelho); color: var(--cor-vermelho) !important;">
+                                        🔌 Desconectar
+                                    </button>
+                                </form>
+
                             </div>
                         </td>
                     </tr>
@@ -34,8 +44,13 @@
             </table>
         </figure>
     {% else %}
-        <p>Você ainda não cadastrou nenhum formulário.</p>
+        <article style="text-align: center; padding: 2rem; border: 2px dashed #ccc;">
+            <p style="font-size: 1.1rem; color: #555;">Você ainda não conectou nenhum formulário.</p>
+            <p>Clique no botão acima para buscar e adicionar seu primeiro formulário.</p>
+        </article>
     {% endif %}
     
-    <a href="{{ url_for('main.dashboard') }}">Voltar para o Dashboard</a>
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="{{ url_for('main.dashboard') }}" role="button">← Voltar ao Dashboard</a>
+    </div>
 {% endblock %}
