@@ -137,6 +137,68 @@ def confirm_email(token):
     return redirect(url_for('main.login'))
 
 
+# --- ROTAS DE RESET DE SENHA ---
+
+@main.route("/reset_password", methods=['GET', 'POST'])
+def reset_request():
+    """Solicitar reset de senha por e-mail"""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            token = user.get_reset_token()
+            reset_link = url_for('main.reset_token', token=token, _external=True)
+            html_content = f'''
+                <p>Olá {user.username},</p>
+                <p>Recebemos uma solicitação para resetar a senha da sua conta.</p>
+                <p>Para criar uma nova senha, clique no link abaixo (válido por 30 minutos):</p>
+                <a href="{reset_link}">Resetar Senha</a>
+                <p>Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
+            '''
+            send_email(user.email, 'Solicitação de Reset de Senha', html_content)
+            flash('Um e-mail com instruções foi enviado para o endereço informado.', 'info')
+            return redirect(url_for('main.login'))
+        else:
+            # Por segurança, não informamos se o e-mail existe ou não
+            flash('Se este e-mail estiver cadastrado, você receberá instruções.', 'info')
+            return redirect(url_for('main.login'))
+    
+    return render_template('request_reset.html', title='Resetar Senha')
+
+
+@main.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_token(token):
+    """Processar o reset de senha com o token"""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    
+    user = User.verify_reset_token(token)
+    if not user:
+        flash('O link de reset é inválido ou expirou.', 'warning')
+        return redirect(url_for('main.reset_request'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if password != confirm_password:
+            flash('As senhas não coincidem.', 'danger')
+            return render_template('reset_token.html', title='Nova Senha')
+        
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        user.password_hash = hashed_password
+        db.session.commit()
+        
+        flash('Sua senha foi atualizada com sucesso! Faça login com a nova senha.', 'success')
+        return redirect(url_for('main.login'))
+    
+    return render_template('reset_token.html', title='Nova Senha')
+
+
 # --- ROTAS DE GERENCIAMENTO DE FORMS E DADOS ---
 
 @main.route("/manage_sheets", methods=['GET', 'POST'])
