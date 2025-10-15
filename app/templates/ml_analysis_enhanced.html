@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+    margin: 2rem 0;
+}
+.ai-icon {
+    font-size: 2rem;
+    animation: pulse 2s infinite;
+}
+</style>
+
+<div class="ai-header">
+    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+        <span class="ai-icon">🤖</span>
+        <div>
+            <h1 style="margin: 0; font-size: 2rem; color: var(--cor-branco);">Análise Inteligente com IA</h1>
+            <p style="margin: 0; opacity: 0.9;">Insights automatizados sobre {{ total_estudantes }} estudantes</p>
+        </div>
+    </div>
+</div>
+
+{% if insights_ia %}
+<div class="insight-card" style="animation-delay: 0.1s;">
+    <h3>📊 Resumo Executivo</h3>
+    <p>{{ insights_ia.resumo_executivo }}</p>
+</div>
+
+<div class="insight-card" style="animation-delay: 0.2s;">
+    <h3>📈 Tendências Identificadas</h3>
+    <ul>
+        {% for tendencia in insights_ia.tendencias %}
+        <li>{{ tendencia }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="insight-card" style="animation-delay: 0.3s; border-left-color: var(--cor-vermelho);">
+    <h3>💡 Recomendações Estratégicas</h3>
+    <ol>
+        {% for recomendacao in insights_ia.recomendacoes %}
+        <li>{{ recomendacao }}</li>
+        {% endfor %}
+    </ol>
+</div>
+{% endif %}
+
+<h2 class="font-subtitle" style="text-align: center; margin: 3rem 0 2rem 0;">Visualização dos Dados</h2>
+
+<div class="chart-grid">
+    <div class="chart-box" style="animation-delay: 0.6s;">
+        <h4>Distribuição dos Perfis</h4>
+        <canvas id="segmentosChart"></canvas>
+    </div>
+    <div class="chart-box" style="animation-delay: 0.7s;">
+        <h4>Idade Média por Perfil</h4>
+        <canvas id="idadeChart"></canvas>
+    </div>
+    <div class="chart-box" style="animation-delay: 0.8s; grid-column: 1 / -1;">
+        <h4>Evolução de Cadastros (Últimos 7 dias)</h4>
+        <canvas id="timelineChart"></canvas>
+    </div>
+</div>
+
+<h2 class="font-subtitle" style="text-align: center; margin: 3rem 0 2rem 0;">Perfis de Estudantes Identificados</h2>
+
+{% for seg in segmentos %}
+<div class="segmento-card" style="animation-delay: {{ 0.9 + loop.index0 * 0.1 }}s;">
+    <h3>Perfil {{ seg.id + 1 }} ({{ seg.total }} estudantes)</h3>
+    <p><strong>Idade média:</strong> {{ seg.idade_media }} | <strong>Cidade principal:</strong> {{ seg.cidade_principal }} | <strong>Interesse:</strong> {{ seg.curso_principal }}</p>
+    <details>
+        <summary>Ver estudantes deste perfil</summary>
+        <table>
+            <thead><tr><th>Nome</th><th>Idade</th><th>Cidade</th><th>Interesse</th></tr></thead>
+            <tbody>
+                {% for aluno in seg.alunos %}
+                <tr><td>{{ aluno.nome }}</td><td>{{ aluno.idade }}</td><td>{{ aluno.cidade }}</td><td>{{ aluno.curso_interesse }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+</div>
+{% endfor %}
+
+<div style="text-align: center; margin-top: 3rem;">
+    <a href="{{ url_for('main.dashboard') }}" role="button">← Voltar ao Dashboard</a>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const graficosData = {{ graficos_data | tojson | safe }};
+
+    // Gráfico de Perfis (Doughnut)
+    new Chart(document.getElementById('segmentosChart'), {
+        type: 'doughnut',
+        data: {
+            labels: graficosData.distribuicao_segmentos.labels,
+            datasets: [{ 
+                data: graficosData.distribuicao_segmentos.values, 
+                backgroundColor: graficosData.distribuicao_segmentos.cores 
+            }]
+        }
+    });
+
+    // Gráfico de Idade (Bar)
+    new Chart(document.getElementById('idadeChart'), {
+        type: 'bar',
+        data: {
+            labels: graficosData.idade_por_segmento.labels,
+            datasets: [{ 
+                label: 'Idade Média', 
+                data: graficosData.idade_por_segmento.values, 
+                backgroundColor: 'var(--cor-azul)'
+            }]
+        }
+    });
+
+    // Gráfico de Timeline (Line)
+    if (graficosData.timeline_cadastros.labels.length > 0) {
+        new Chart(document.getElementById('timelineChart'), {
+            type: 'line',
+            data: {
+                labels: graficosData.timeline_cadastros.labels,
+                datasets: [{ 
+                    label: 'Novos Cadastros', 
+                    data: graficosData.timeline_cadastros.values, 
+                    borderColor: 'var(--cor-vermelho)', 
+                    tension: 0.4, 
+                    fill: true 
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+});
+</script>
+
+{% endblock %}
