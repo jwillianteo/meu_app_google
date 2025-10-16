@@ -15,6 +15,9 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 import warnings
 
+# Importa a nova função para obter as credenciais do Google
+from app.google_credentials import get_google_client_secret
+
 # Suprimir avisos do oauthlib sobre mudanças de escopo
 warnings.filterwarnings('ignore', message='.*scope.*')
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
@@ -136,66 +139,44 @@ def confirm_email(token):
         flash('O link de confirmação é inválido ou expirou.', 'danger')
     return redirect(url_for('main.login'))
 
-
 # --- ROTAS DE RESET DE SENHA ---
-
 @main.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
-    """Solicitar reset de senha por e-mail"""
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
-    
     if request.method == 'POST':
-        email = request.form.get('email')
-        user = User.query.filter_by(email=email).first()
-        
+        user = User.query.filter_by(email=request.form.get('email')).first()
         if user:
             token = user.get_reset_token()
             reset_link = url_for('main.reset_token', token=token, _external=True)
             html_content = f'''
                 <p>Olá {user.username},</p>
-                <p>Recebemos uma solicitação para resetar a senha da sua conta.</p>
-                <p>Para criar uma nova senha, clique no link abaixo (válido por 30 minutos):</p>
-                <a href="{reset_link}">Resetar Senha</a>
-                <p>Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
+                <p>Para redefinir sua senha, clique no link a seguir:</p>
+                <a href="{reset_link}">Redefinir Senha</a>
+                <p>Se você não solicitou esta alteração, ignore este e-mail.</p>
             '''
-            send_email(user.email, 'Solicitação de Reset de Senha', html_content)
-            flash('Um e-mail com instruções foi enviado para o endereço informado.', 'info')
+            send_email(user.email, 'Redefinição de Senha', html_content)
+            flash('Um e-mail com instruções para redefinir sua senha foi enviado.', 'info')
             return redirect(url_for('main.login'))
         else:
-            # Por segurança, não informamos se o e-mail existe ou não
-            flash('Se este e-mail estiver cadastrado, você receberá instruções.', 'info')
-            return redirect(url_for('main.login'))
-    
+            flash('E-mail não encontrado em nosso sistema.', 'warning')
     return render_template('request_reset.html', title='Resetar Senha')
 
 
 @main.route("/reset_password/<token>", methods=['GET', 'POST'])
 def reset_token(token):
-    """Processar o reset de senha com o token"""
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
-    
     user = User.verify_reset_token(token)
-    if not user:
-        flash('O link de reset é inválido ou expirou.', 'warning')
+    if user is None:
+        flash('O link de redefinição é inválido ou expirou.', 'warning')
         return redirect(url_for('main.reset_request'))
-    
     if request.method == 'POST':
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        
-        if password != confirm_password:
-            flash('As senhas não coincidem.', 'danger')
-            return render_template('reset_token.html', title='Nova Senha')
-        
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        hashed_password = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
         user.password_hash = hashed_password
         db.session.commit()
-        
-        flash('Sua senha foi atualizada com sucesso! Faça login com a nova senha.', 'success')
+        flash('Sua senha foi atualizada! Você já pode fazer o login.', 'success')
         return redirect(url_for('main.login'))
-    
     return render_template('reset_token.html', title='Nova Senha')
 
 
@@ -514,8 +495,11 @@ def ml_analysis():
 @main.route("/authorize_google")
 @login_required
 def authorize_google():
+    # Usa a função para obter o caminho do arquivo de credenciais
+    client_secrets_path = get_google_client_secret()
+    
     flow = Flow.from_client_secrets_file(
-        'client_secret.json',
+        client_secrets_path,
         scopes=SCOPES,
         redirect_uri=url_for('main.google_callback', _external=True)
     )
@@ -532,8 +516,11 @@ def authorize_google():
 @login_required
 def google_callback():
     state = session.get('google_oauth_state')
+    # Usa a função para obter o caminho do arquivo de credenciais
+    client_secrets_path = get_google_client_secret()
+
     flow = Flow.from_client_secrets_file(
-        'client_secret.json',
+        client_secrets_path,
         scopes=SCOPES,
         state=state,
         redirect_uri=url_for('main.google_callback', _external=True)
@@ -564,6 +551,7 @@ def disconnect_google():
 
 
 @main.route("/logout")
+@login_required
 def logout():
     logout_user()
     session.clear()
