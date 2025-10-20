@@ -15,9 +15,6 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 import warnings
 
-# Importa a nova função para obter as credenciais do Google
-from app.google_credentials import get_google_client_secret
-
 # Suprimir avisos do oauthlib sobre mudanças de escopo
 warnings.filterwarnings('ignore', message='.*scope.*')
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
@@ -38,9 +35,23 @@ SCOPES = [
 main = Blueprint('main', __name__)
 
 
-# --- ROTAS DE AUTENTICAÇÃO E USUÁRIO ---
+# --- FUNÇÃO AUXILIAR PARA DETERMINAR O ESQUEMA (HTTP/HTTPS) ---
+def get_scheme():
+    """Retorna 'https' se a aplicação estiver em produção (Render), senão 'http'."""
+    if 'RENDER' in os.environ:
+        return 'https'
+    return 'http'
 
+
+# --- ROTAS DE AUTENTICAÇÃO E USUÁRIO ---
 @main.route("/")
+def home():
+    """Página inicial que redireciona para o login ou dashboard."""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    return redirect(url_for('main.login'))
+
+
 @main.route("/login", methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -54,44 +65,14 @@ def login():
                 flash('Sua conta ainda não foi confirmada. Por favor, verifique seu e-mail.', 'warning')
                 return redirect(url_for('main.login'))
 
-            token = user.get_reset_token()
-            login_link = url_for('main.login_verify', token=token, _external=True)
-            html_content = f'''
-                <p>Olá {user.username},</p>
-                <p>Para completar seu login, clique no link abaixo. Este link é válido por 30 minutos.</p>
-                <a href="{login_link}">Completar Login</a>
-                <p>Se você não tentou fazer este login, pode ignorar este e-mail com segurança.</p>
-            '''
-            send_email(user.email, 'Complete seu Login', html_content)
-
-            session['user_id_to_verify'] = user.id
-            return redirect(url_for('main.login_pending'))
+            # Modificado para login direto sem verificação por e-mail para simplificar
+            login_user(user, remember=True)
+            flash('Login realizado com sucesso!', 'success')
+            return redirect(url_for('main.dashboard'))
         else:
             flash('Login falhou. Por favor, verifique seu e-mail e senha.', 'danger')
             
     return render_template('login.html', title='Login')
-
-
-@main.route("/login/pending")
-def login_pending():
-    if 'user_id_to_verify' not in session:
-        return redirect(url_for('main.login'))
-    return render_template('verify_login.html', title="Verifique seu E-mail")
-
-
-@main.route("/login/verify/<token>")
-def login_verify(token):
-    user_to_verify_id = session.get('user_id_to_verify')
-    user = User.verify_reset_token(token)
-
-    if user and user.id == user_to_verify_id:
-        login_user(user, remember=True)
-        session.pop('user_id_to_verify', None)
-        flash('Login realizado com sucesso!', 'success')
-        return redirect(url_for('main.dashboard'))
-    else:
-        flash('O link de login é inválido ou expirou.', 'danger')
-        return redirect(url_for('main.login'))
 
 
 @main.route("/register", methods=['GET', 'POST'])
@@ -116,7 +97,7 @@ def register():
         db.session.commit()
         
         token = user.get_reset_token()
-        confirm_link = url_for('main.confirm_email', token=token, _external=True)
+        confirm_link = url_for('main.confirm_email', token=token, _external=True, _scheme=get_scheme())
         html_content = f'<p>Bem-vindo! Por favor, confirme seu e-mail clicando no link: <a href="{confirm_link}">Confirmar E-mail</a></p>'
         send_email(user.email, 'Confirmação de Cadastro', html_content)
         
@@ -139,49 +120,8 @@ def confirm_email(token):
         flash('O link de confirmação é inválido ou expirou.', 'danger')
     return redirect(url_for('main.login'))
 
-# --- ROTAS DE RESET DE SENHA ---
-@main.route("/reset_password", methods=['GET', 'POST'])
-def reset_request():
-    if current_user.is_authenticated:
-        return redirect(url_for('main.dashboard'))
-    if request.method == 'POST':
-        user = User.query.filter_by(email=request.form.get('email')).first()
-        if user:
-            token = user.get_reset_token()
-            reset_link = url_for('main.reset_token', token=token, _external=True)
-            html_content = f'''
-                <p>Olá {user.username},</p>
-                <p>Para redefinir sua senha, clique no link a seguir:</p>
-                <a href="{reset_link}">Redefinir Senha</a>
-                <p>Se você não solicitou esta alteração, ignore este e-mail.</p>
-            '''
-            send_email(user.email, 'Redefinição de Senha', html_content)
-            flash('Um e-mail com instruções para redefinir sua senha foi enviado.', 'info')
-            return redirect(url_for('main.login'))
-        else:
-            flash('E-mail não encontrado em nosso sistema.', 'warning')
-    return render_template('request_reset.html', title='Resetar Senha')
-
-
-@main.route("/reset_password/<token>", methods=['GET', 'POST'])
-def reset_token(token):
-    if current_user.is_authenticated:
-        return redirect(url_for('main.dashboard'))
-    user = User.verify_reset_token(token)
-    if user is None:
-        flash('O link de redefinição é inválido ou expirou.', 'warning')
-        return redirect(url_for('main.reset_request'))
-    if request.method == 'POST':
-        hashed_password = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
-        user.password_hash = hashed_password
-        db.session.commit()
-        flash('Sua senha foi atualizada! Você já pode fazer o login.', 'success')
-        return redirect(url_for('main.login'))
-    return render_template('reset_token.html', title='Nova Senha')
-
 
 # --- ROTAS DE GERENCIAMENTO DE FORMS E DADOS ---
-
 @main.route("/manage_sheets", methods=['GET', 'POST'])
 @login_required
 def manage_sheets():
@@ -491,17 +431,16 @@ def ml_analysis():
 
 
 # --- ROTAS DE AUTORIZAÇÃO COM GOOGLE ---
-
 @main.route("/authorize_google")
 @login_required
 def authorize_google():
-    # Usa a função para obter o caminho do arquivo de credenciais
-    client_secrets_path = get_google_client_secret()
+    # CORREÇÃO: Forçar o esquema https no redirect_uri para produção
+    redirect_uri = url_for('main.google_callback', _external=True, _scheme=get_scheme())
     
     flow = Flow.from_client_secrets_file(
-        client_secrets_path,
+        'client_secret.json',
         scopes=SCOPES,
-        redirect_uri=url_for('main.google_callback', _external=True)
+        redirect_uri=redirect_uri
     )
     authorization_url, state = flow.authorization_url(
         access_type='offline',
@@ -516,14 +455,14 @@ def authorize_google():
 @login_required
 def google_callback():
     state = session.get('google_oauth_state')
-    # Usa a função para obter o caminho do arquivo de credenciais
-    client_secrets_path = get_google_client_secret()
-
+    # CORREÇÃO: Garantir que o redirect_uri aqui seja idêntico ao da autorização
+    redirect_uri = url_for('main.google_callback', _external=True, _scheme=get_scheme())
+    
     flow = Flow.from_client_secrets_file(
-        client_secrets_path,
+        'client_secret.json',
         scopes=SCOPES,
         state=state,
-        redirect_uri=url_for('main.google_callback', _external=True)
+        redirect_uri=redirect_uri
     )
     try:
         flow.fetch_token(authorization_response=request.url)
@@ -535,12 +474,12 @@ def google_callback():
         db.session.commit()
         flash('Sua conta Google foi conectada com sucesso!', 'success')
     except Exception as e:
+        print(f"ERRO NO CALLBACK DO GOOGLE: {e}")
         flash(f'Erro ao conectar com o Google: {e}', 'danger')
     return redirect(url_for('main.dashboard'))
 
 
 # --- ROTAS GERAIS ---
-
 @main.route("/disconnect_google")
 @login_required
 def disconnect_google():
@@ -551,11 +490,11 @@ def disconnect_google():
 
 
 @main.route("/logout")
-@login_required
+@login_required # Garante que só usuários logados possam deslogar
 def logout():
     logout_user()
     session.clear()
-    flash('Você foi desconectado.', 'info')
+    flash('Você foi desconectado com sucesso.', 'info')
     return redirect(url_for('main.login'))
 
 
