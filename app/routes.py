@@ -15,6 +15,9 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 import warnings
 
+# Importa a nova função para obter as credenciais do Google
+from app.google_credentials import get_google_client_secret
+
 # Suprimir avisos do oauthlib sobre mudanças de escopo
 warnings.filterwarnings('ignore', message='.*scope.*')
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
@@ -135,6 +138,46 @@ def confirm_email(token):
     else:
         flash('O link de confirmação é inválido ou expirou.', 'danger')
     return redirect(url_for('main.login'))
+
+# --- ROTAS DE RESET DE SENHA ---
+@main.route("/reset_password", methods=['GET', 'POST'])
+def reset_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    if request.method == 'POST':
+        user = User.query.filter_by(email=request.form.get('email')).first()
+        if user:
+            token = user.get_reset_token()
+            reset_link = url_for('main.reset_token', token=token, _external=True)
+            html_content = f'''
+                <p>Olá {user.username},</p>
+                <p>Para redefinir sua senha, clique no link a seguir:</p>
+                <a href="{reset_link}">Redefinir Senha</a>
+                <p>Se você não solicitou esta alteração, ignore este e-mail.</p>
+            '''
+            send_email(user.email, 'Redefinição de Senha', html_content)
+            flash('Um e-mail com instruções para redefinir sua senha foi enviado.', 'info')
+            return redirect(url_for('main.login'))
+        else:
+            flash('E-mail não encontrado em nosso sistema.', 'warning')
+    return render_template('request_reset.html', title='Resetar Senha')
+
+
+@main.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_token(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('O link de redefinição é inválido ou expirou.', 'warning')
+        return redirect(url_for('main.reset_request'))
+    if request.method == 'POST':
+        hashed_password = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
+        user.password_hash = hashed_password
+        db.session.commit()
+        flash('Sua senha foi atualizada! Você já pode fazer o login.', 'success')
+        return redirect(url_for('main.login'))
+    return render_template('reset_token.html', title='Nova Senha')
 
 
 # --- ROTAS DE GERENCIAMENTO DE FORMS E DADOS ---
@@ -452,8 +495,11 @@ def ml_analysis():
 @main.route("/authorize_google")
 @login_required
 def authorize_google():
+    # Usa a função para obter o caminho do arquivo de credenciais
+    client_secrets_path = get_google_client_secret()
+    
     flow = Flow.from_client_secrets_file(
-        'client_secret.json',
+        client_secrets_path,
         scopes=SCOPES,
         redirect_uri=url_for('main.google_callback', _external=True)
     )
@@ -470,8 +516,11 @@ def authorize_google():
 @login_required
 def google_callback():
     state = session.get('google_oauth_state')
+    # Usa a função para obter o caminho do arquivo de credenciais
+    client_secrets_path = get_google_client_secret()
+
     flow = Flow.from_client_secrets_file(
-        'client_secret.json',
+        client_secrets_path,
         scopes=SCOPES,
         state=state,
         redirect_uri=url_for('main.google_callback', _external=True)
@@ -502,6 +551,7 @@ def disconnect_google():
 
 
 @main.route("/logout")
+@login_required
 def logout():
     logout_user()
     session.clear()

@@ -8,8 +8,8 @@ set -o errexit
 echo "Instalando dependências..."
 pip install -r requirements.txt
 
-# 2. Executa as migrações do banco de dados
-echo "Executando migrações do banco de dados..."
-flask db upgrade
+# 2. Cria as tabelas do banco de dados diretamente
+echo "Criando tabelas do banco de dados..."
+python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()"
 
 echo "Build finalizado com sucesso!"
