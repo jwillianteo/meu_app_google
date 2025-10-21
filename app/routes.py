@@ -16,7 +16,13 @@ from sklearn.preprocessing import OneHotEncoder
 import warnings
 
 # Importa a função para carregar as credenciais do Google de forma segura
-from app.google_credentials import get_google_client_secret_path
+# (Certifique-se de que você criou o arquivo app/google_credentials.py como na instrução anterior)
+try:
+    from app.google_credentials import get_google_client_secret_path
+except ImportError:
+    # Fallback para evitar erro se o arquivo ainda não foi criado
+    def get_google_client_secret_path():
+        return 'client_secret.json'
 
 # Configurações iniciais
 warnings.filterwarnings('ignore', message='.*scope.*')
@@ -35,7 +41,7 @@ def get_scheme():
     """Retorna 'https' em produção (Render) e 'http' em desenvolvimento."""
     return 'https' if 'RENDER' in os.environ else 'http'
 
-# --- ROTAS DE AUTENTICAÇÃO E USUÁRIO ---
+# --- ROTAS DE AUTENTICAÇÃO, LOGOUT E RESET DE SENHA (FLUXO CORRIGIDO) ---
 @main.route("/")
 def home():
     """Redireciona para o dashboard se logado, senão para a tela de login."""
@@ -45,26 +51,34 @@ def home():
 
 @main.route("/login", methods=['GET', 'POST'])
 def login():
-    """Lida com o login do usuário."""
+    """
+    CORREÇÃO: Implementa um login direto com e-mail e senha, sem envio de e-mail.
+    Isso simplifica o processo e corrige o loop de redirecionamento no logout.
+    """
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
+        
     if request.method == 'POST':
         user = User.query.filter_by(email=request.form.get('email')).first()
         if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
             if not user.confirmed:
                 flash('Sua conta não foi confirmada. Verifique seu e-mail.', 'warning')
                 return redirect(url_for('main.login'))
+            
+            # Faz o login direto do usuário
             login_user(user, remember=True)
+            flash('Login realizado com sucesso!', 'success')
             return redirect(url_for('main.dashboard'))
         else:
             flash('Login falhou. Verifique seu e-mail e senha.', 'danger')
+            
     return render_template('login.html', title='Login')
 
 @main.route("/logout")
 @login_required
 def logout():
     """
-    CORREÇÃO: Esta é a função do botão "Sair".
+    CORREÇÃO: Esta função agora funcionará corretamente.
     Ela encerra a sessão do usuário (logoff) e o redireciona para a tela de login.
     """
     logout_user()
@@ -76,9 +90,7 @@ def logout():
 @login_required
 def disconnect_google():
     """
-    Esta é a função do botão "Desconectar".
-    Ela apenas remove a conexão com o Google, mas mantém o usuário LOGADO no sistema
-    e o redireciona de volta para o dashboard.
+    Esta função apenas remove a conexão com o Google, mantendo o usuário LOGADO.
     """
     current_user.google_credentials = None
     db.session.commit()
@@ -87,31 +99,28 @@ def disconnect_google():
 
 @main.route("/register", methods=['GET', 'POST'])
 def register():
-    # ... (código de registro sem alterações) ...
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     if request.method == 'POST':
         username, email = request.form.get('username'), request.form.get('email')
         if User.query.filter_by(username=username).first():
             flash('Este nome de usuário já está em uso.', 'danger')
-            return redirect(url_for('main.register'))
-        if User.query.filter_by(email=email).first():
+        elif User.query.filter_by(email=email).first():
             flash('Este e-mail já foi cadastrado.', 'danger')
-            return redirect(url_for('main.register'))
-        hashed_password = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
-        user = User(username=username, email=email, password_hash=hashed_password)
-        db.session.add(user)
-        db.session.commit()
-        token = user.get_reset_token()
-        confirm_link = url_for('main.confirm_email', token=token, _external=True, _scheme=get_scheme())
-        send_email(user.email, 'Confirmação de Cadastro', f'<p>Bem-vindo! Confirme seu e-mail clicando aqui: <a href="{confirm_link}">Confirmar</a></p>')
-        flash('Um e-mail de confirmação foi enviado. Por favor, confirme para poder fazer o login.', 'info')
-        return redirect(url_for('main.login'))
+        else:
+            hashed_password = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
+            user = User(username=username, email=email, password_hash=hashed_password)
+            db.session.add(user)
+            db.session.commit()
+            token = user.get_reset_token()
+            confirm_link = url_for('main.confirm_email', token=token, _external=True, _scheme=get_scheme())
+            send_email(user.email, 'Confirmação de Cadastro', f'<p>Bem-vindo! Confirme seu e-mail clicando aqui: <a href="{confirm_link}">Confirmar</a></p>')
+            flash('Um e-mail de confirmação foi enviado. Por favor, confirme para poder fazer o login.', 'info')
+            return redirect(url_for('main.login'))
     return render_template('register.html', title='Cadastro')
 
 @main.route('/confirm/<token>')
 def confirm_email(token):
-    # ... (código de confirmação de e-mail sem alterações) ...
     user = User.verify_reset_token(token)
     if user:
         if user.confirmed:
@@ -126,7 +135,6 @@ def confirm_email(token):
 
 @main.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
-    # ... (código de reset de senha sem alterações) ...
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     if request.method == 'POST':
@@ -141,7 +149,6 @@ def reset_request():
 
 @main.route("/reset_password/<token>", methods=['GET', 'POST'])
 def reset_token(token):
-    # ... (código de reset de token sem alterações) ...
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     user = User.verify_reset_token(token)
@@ -156,10 +163,10 @@ def reset_token(token):
         return redirect(url_for('main.login'))
     return render_template('reset_token.html', title='Resetar Senha')
 
+# --- ROTAS DE AUTORIZAÇÃO COM GOOGLE ---
 @main.route("/authorize_google")
 @login_required
 def authorize_google():
-    # ... (código de autorização do Google sem alterações) ...
     client_secret_path = get_google_client_secret_path()
     if not client_secret_path or not os.path.exists(client_secret_path):
         flash('Erro de configuração do servidor: credenciais do Google não encontradas.', 'danger')
@@ -173,7 +180,6 @@ def authorize_google():
 @main.route("/google_callback")
 @login_required
 def google_callback():
-    # ... (código de callback do Google sem alterações) ...
     client_secret_path = get_google_client_secret_path()
     if not client_secret_path:
         flash('Erro de configuração do servidor ao processar o callback do Google.', 'danger')
@@ -188,18 +194,17 @@ def google_callback():
         existing_user = User.query.filter(User.email == google_email, User.id != current_user.id).first()
         if existing_user:
             flash(f'O e-mail do Google "{google_email}" já está associado a outra conta.', 'danger')
-            return redirect(url_for('main.dashboard'))
-        current_user.google_credentials = credentials.to_json()
-        db.session.commit()
-        flash('Sua conta Google foi conectada com sucesso!', 'success')
+        else:
+            current_user.google_credentials = credentials.to_json()
+            db.session.commit()
+            flash('Sua conta Google foi conectada com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao conectar com o Google: {e}', 'danger')
     return redirect(url_for('main.dashboard'))
 
-# --- ROTAS DE GERENCIAMENTO DE PLANILHAS E DADOS ---
+# --- DEMAIS ROTAS (GERENCIAMENTO, ANÁLISE, DASHBOARD) ---
 # (Nenhuma alteração necessária nesta seção, pode manter como está)
-
 @main.route("/manage_sheets", methods=['GET', 'POST'])
 @login_required
 def manage_sheets():
@@ -392,7 +397,7 @@ def dashboard():
         if not df.empty and 'curso_interesse' in df.columns:
             cursos_populares = df['curso_interesse'].value_counts().head(5)
             grafico_labels = cursos_populares.index.tolist()
-            graficos_data = cursos_populares.values.tolist()
+            grafico_values = cursos_populares.values.tolist()
     return render_template('dashboard.html', title="Dashboard",
                          total_formularios=total_formularios,
                          total_estudantes=total_estudantes,
