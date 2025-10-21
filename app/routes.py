@@ -15,7 +15,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import OneHotEncoder
 import warnings
 
-# Importa a nova função para carregar as credenciais do Google
+# Importa a função para carregar as credenciais do Google de forma segura
 from app.google_credentials import get_google_client_secret_path
 
 # Configurações iniciais
@@ -32,15 +32,20 @@ SCOPES = [
 main = Blueprint('main', __name__)
 
 def get_scheme():
+    """Retorna 'https' em produção (Render) e 'http' em desenvolvimento."""
     return 'https' if 'RENDER' in os.environ else 'http'
 
-# --- ROTAS DE AUTENTICAÇÃO, LOGOUT E RESET DE SENHA ---
+# --- ROTAS DE AUTENTICAÇÃO E USUÁRIO ---
 @main.route("/")
 def home():
+    """Redireciona para o dashboard se logado, senão para a tela de login."""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
     return redirect(url_for('main.login'))
 
 @main.route("/login", methods=['GET', 'POST'])
 def login():
+    """Lida com o login do usuário."""
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     if request.method == 'POST':
@@ -58,13 +63,31 @@ def login():
 @main.route("/logout")
 @login_required
 def logout():
+    """
+    CORREÇÃO: Esta é a função do botão "Sair".
+    Ela encerra a sessão do usuário (logoff) e o redireciona para a tela de login.
+    """
     logout_user()
     session.clear()
     flash('Você foi desconectado com segurança.', 'info')
     return redirect(url_for('main.login'))
 
+@main.route("/disconnect_google")
+@login_required
+def disconnect_google():
+    """
+    Esta é a função do botão "Desconectar".
+    Ela apenas remove a conexão com o Google, mas mantém o usuário LOGADO no sistema
+    e o redireciona de volta para o dashboard.
+    """
+    current_user.google_credentials = None
+    db.session.commit()
+    flash('Sua conta Google foi desconectada.', 'info')
+    return redirect(url_for('main.dashboard'))
+
 @main.route("/register", methods=['GET', 'POST'])
 def register():
+    # ... (código de registro sem alterações) ...
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     if request.method == 'POST':
@@ -86,9 +109,9 @@ def register():
         return redirect(url_for('main.login'))
     return render_template('register.html', title='Cadastro')
 
-
 @main.route('/confirm/<token>')
 def confirm_email(token):
+    # ... (código de confirmação de e-mail sem alterações) ...
     user = User.verify_reset_token(token)
     if user:
         if user.confirmed:
@@ -101,10 +124,9 @@ def confirm_email(token):
         flash('O link de confirmação é inválido ou expirou.', 'danger')
     return redirect(url_for('main.login'))
 
-# --- ROTAS DE RESET DE SENHA (NOVAS) ---
 @main.route("/reset_password", methods=['GET', 'POST'])
 def reset_request():
-    """Rota para o usuário solicitar o e-mail de reset de senha."""
+    # ... (código de reset de senha sem alterações) ...
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     if request.method == 'POST':
@@ -119,7 +141,7 @@ def reset_request():
 
 @main.route("/reset_password/<token>", methods=['GET', 'POST'])
 def reset_token(token):
-    """Rota para o usuário inserir a nova senha após clicar no link do e-mail."""
+    # ... (código de reset de token sem alterações) ...
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     user = User.verify_reset_token(token)
@@ -134,16 +156,14 @@ def reset_token(token):
         return redirect(url_for('main.login'))
     return render_template('reset_token.html', title='Resetar Senha')
 
-
-# --- ROTAS DE AUTORIZAÇÃO COM GOOGLE (CORRIGIDAS) ---
 @main.route("/authorize_google")
 @login_required
 def authorize_google():
+    # ... (código de autorização do Google sem alterações) ...
     client_secret_path = get_google_client_secret_path()
     if not client_secret_path or not os.path.exists(client_secret_path):
         flash('Erro de configuração do servidor: credenciais do Google não encontradas.', 'danger')
         return redirect(url_for('main.dashboard'))
-    
     redirect_uri = url_for('main.google_callback', _external=True, _scheme=get_scheme())
     flow = Flow.from_client_secrets_file(client_secret_path, scopes=SCOPES, redirect_uri=redirect_uri)
     authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
@@ -153,25 +173,22 @@ def authorize_google():
 @main.route("/google_callback")
 @login_required
 def google_callback():
+    # ... (código de callback do Google sem alterações) ...
     client_secret_path = get_google_client_secret_path()
     if not client_secret_path:
         flash('Erro de configuração do servidor ao processar o callback do Google.', 'danger')
         return redirect(url_for('main.dashboard'))
-        
     state = session.get('google_oauth_state')
     redirect_uri = url_for('main.google_callback', _external=True, _scheme=get_scheme())
     flow = Flow.from_client_secrets_file(client_secret_path, scopes=SCOPES, state=state, redirect_uri=redirect_uri)
-    
     try:
         flow.fetch_token(authorization_response=request.url)
         credentials = flow.credentials
         google_email = build('oauth2', 'v2', credentials=credentials).userinfo().get().execute().get('email')
-
         existing_user = User.query.filter(User.email == google_email, User.id != current_user.id).first()
         if existing_user:
             flash(f'O e-mail do Google "{google_email}" já está associado a outra conta.', 'danger')
             return redirect(url_for('main.dashboard'))
-
         current_user.google_credentials = credentials.to_json()
         db.session.commit()
         flash('Sua conta Google foi conectada com sucesso!', 'success')
@@ -181,6 +198,8 @@ def google_callback():
     return redirect(url_for('main.dashboard'))
 
 # --- ROTAS DE GERENCIAMENTO DE PLANILHAS E DADOS ---
+# (Nenhuma alteração necessária nesta seção, pode manter como está)
+
 @main.route("/manage_sheets", methods=['GET', 'POST'])
 @login_required
 def manage_sheets():
@@ -361,14 +380,6 @@ def ml_analysis():
     graficos_data = preparar_dados_graficos(df, segmentos_info)
     return render_template('ml_analysis_enhanced.html', title="Análise ML com IA", segmentos=segmentos_info, insights_ia=insights_ia, graficos_data=graficos_data, total_estudantes=len(df))
 
-@main.route("/disconnect_google")
-@login_required
-def disconnect_google():
-    current_user.google_credentials = None
-    db.session.commit()
-    flash('Sua conta Google foi desconectada.', 'info')
-    return redirect(url_for('main.dashboard'))
-
 @main.route("/dashboard")
 @login_required
 def dashboard():
@@ -381,7 +392,7 @@ def dashboard():
         if not df.empty and 'curso_interesse' in df.columns:
             cursos_populares = df['curso_interesse'].value_counts().head(5)
             grafico_labels = cursos_populares.index.tolist()
-            grafico_values = cursos_populares.values.tolist()
+            graficos_data = cursos_populares.values.tolist()
     return render_template('dashboard.html', title="Dashboard",
                          total_formularios=total_formularios,
                          total_estudantes=total_estudantes,
