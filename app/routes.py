@@ -72,12 +72,31 @@ def login():
 def logout():
     """
     CORREÇÃO APLICADA:
-    Realiza o logout do usuário, limpa a sessão e redireciona para a página de login.
+    Realiza o logout completo do usuário, limpa a sessão e redireciona para a página de login.
     """
-    logout_user()
-    session.clear()
-    flash('Você foi desconectado com segurança.', 'info')
-    return redirect(url_for('main.login'))
+    try:
+        # 1. Faz logout do Flask-Login
+        logout_user()
+        
+        # 2. Limpa toda a sessão (incluindo dados do Google OAuth)
+        session.clear()
+        
+        # 3. Adiciona mensagem de sucesso
+        flash('Você foi desconectado com sucesso.', 'info')
+        
+        # 4. Redireciona para login com código 302 explícito
+        response = redirect(url_for('main.login'), code=302)
+        
+        # 5. Remove cookies de sessão (segurança extra)
+        response.set_cookie('session', '', expires=0)
+        
+        return response
+        
+    except Exception as e:
+        print(f"Erro no logout: {e}")
+        # Mesmo com erro, tenta limpar e redirecionar
+        session.clear()
+        return redirect(url_for('main.login'))
 
 @main.route("/register", methods=['GET', 'POST'])
 def register():
